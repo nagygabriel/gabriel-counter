@@ -12,18 +12,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Load counter.json
+      - name: Ensure files exist
         run: |
           if [ ! -f counter.json ]; then
             echo "{}" > counter.json
           fi
-
-      - name: Merge counter.json into stats.json
-        run: |
           if [ ! -f stats.json ]; then
             echo '{"kategorie":{},"fotky":{},"detail":{}}' > stats.json
           fi
 
+      - name: Merge counter.json into stats.json
+        run: |
           COUNTER=$(cat counter.json)
           STATS=$(cat stats.json)
 
