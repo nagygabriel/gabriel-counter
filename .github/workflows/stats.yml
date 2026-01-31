@@ -1,8 +1,7 @@
 name: Process Stats
 
 on:
-  schedule:
-    - cron: "*/1 * * * *"   # každou minutu
+  workflow_dispatch:
 
 jobs:
   update:
