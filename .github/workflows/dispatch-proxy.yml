@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Forward request to update-stats
+      - name: Create Issue with token
         run: |
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
-            https://api.github.com/repos/nagygabriel/gabriel-counter/dispatches \
-            -d '{"event_type":"update-stats","client_payload":'"${{ toJson(github.event.client_payload) }}"'}'
+            https://api.github.com/repos/nagygabriel/gabriel-counter/issues \
+            -d "{\"title\":\"Stat update\",\"body\":\"${{ toJson(github.event.client_payload) }}\"}"
