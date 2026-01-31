@@ -1,60 +1,51 @@
-name: Update Stats
+name: Process Stats
 
 on:
-  issues:
-    types: [opened]
+  schedule:
+    - cron: "*/1 * * * *"   # každou minutu
 
 jobs:
   update:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Read issue body
-        id: read
+      - name: Load counter.json
         run: |
-          echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
-          echo "${{ github.event.issue.body }}" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - name: Parse JSON from issue
-        id: parse
-        run: |
-          echo "TYPE=$(echo '${ISSUE_BODY}' | jq -r '.type')" >> $GITHUB_ENV
-          echo "NAME=$(echo '${ISSUE_BODY}' | jq -r '.name')" >> $GITHUB_ENV
-
-      - name: Update stats.json
-        run: |
-          FILE="stats.json"
-
-          if [ ! -f "$FILE" ]; then
-            echo '{"kategorie":{},"fotky":{},"detail":{}}' > $FILE
+          if [ ! -f counter.json ]; then
+            echo "{}" > counter.json
           fi
 
-          EXISTING=$(cat $FILE)
+      - name: Merge counter.json into stats.json
+        run: |
+          if [ ! -f stats.json ]; then
+            echo '{"kategorie":{},"fotky":{},"detail":{}}' > stats.json
+          fi
 
-          UPDATED=$(echo "$EXISTING" | jq --arg t "$TYPE" --arg n "$NAME" '
-            .[$t][$n] = ( .[$t][$n] // 0 ) + 1
+          COUNTER=$(cat counter.json)
+          STATS=$(cat stats.json)
+
+          UPDATED=$(echo "$STATS" "$COUNTER" | jq -s '
+            .[0] as $stats |
+            .[1] as $counter |
+            reduce ($counter | keys[]) as $t ($stats;
+              .[$t] = (
+                reduce ($counter[$t] | keys[]) as $n (.[$t];
+                  .[$n] = ((.[$n] // 0) + $counter[$t][$n])
+                )
+              )
+            )
           ')
 
-          echo "$UPDATED" > $FILE
+          echo "$UPDATED" > stats.json
+          echo "{}" > counter.json
 
-      - name: Commit changes
+      - name: Commit and push
         run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git add stats.json
-          git commit -m "Update stats" || echo "No changes to commit"
-
-      - name: Push changes
-        uses: ad-m/github-push-action@v0.8.0
-        with:
-          github_token: ${{ secrets.GH_TOKEN }}
-
-      - name: Close issue
-        uses: peter-evans/close-issue@v2
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          comment: "Statistika byla úspěšně zpracována."
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add stats.json counter.json
+          git commit -m "Update stats" || echo "No changes"
+          git push
