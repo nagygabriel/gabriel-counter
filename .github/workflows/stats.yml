@@ -1,8 +1,8 @@
 name: Update Stats
 
 on:
-  repository_dispatch:
-    types: [update-stats]
+  issues:
+    types: [opened]
 
 jobs:
   update:
@@ -12,28 +12,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Read incoming data
+      - name: Read issue body
+        id: read
         run: |
-          echo "Incoming payload:"
-          echo '${{ github.event.client_payload }}'
+          echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
+          echo "${{ github.event.issue.body }}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Parse JSON from issue
+        id: parse
+        run: |
+          echo "TYPE=$(echo '${ISSUE_BODY}' | jq -r '.type')" >> $GITHUB_ENV
+          echo "NAME=$(echo '${ISSUE_BODY}' | jq -r '.name')" >> $GITHUB_ENV
 
       - name: Update stats.json
         run: |
           FILE="stats.json"
 
-          # Pokud soubor neexistuje → vytvoříme prázdnou strukturu
           if [ ! -f "$FILE" ]; then
             echo '{"kategorie":{},"fotky":{},"detail":{}}' > $FILE
           fi
 
-          # Načteme existující JSON
           EXISTING=$(cat $FILE)
 
-          # Typ a název z payloadu
-          TYPE='${{ github.event.client_payload.type }}'
-          NAME='${{ github.event.client_payload.name }}'
-
-          # Zvýšíme hodnotu
           UPDATED=$(echo "$EXISTING" | jq --arg t "$TYPE" --arg n "$NAME" '
             .[$t][$n] = ( .[$t][$n] // 0 ) + 1
           ')
@@ -52,3 +53,8 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Close issue
+        uses: peter-evans/close-issue@v2
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment: "Statistika byla úspěšně zpracována."
