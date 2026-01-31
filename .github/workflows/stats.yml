@@ -1,1 +1,54 @@
+name: Update Stats
+
+on:
+  repository_dispatch:
+    types: [update-stats]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Read incoming data
+        run: |
+          echo "Incoming payload:"
+          echo '${{ github.event.client_payload }}'
+
+      - name: Update stats.json
+        run: |
+          FILE="stats.json"
+
+          # Pokud soubor neexistuje → vytvoříme prázdnou strukturu
+          if [ ! -f "$FILE" ]; then
+            echo '{"kategorie":{},"fotky":{},"detail":{}}' > $FILE
+          fi
+
+          # Načteme existující JSON
+          EXISTING=$(cat $FILE)
+
+          # Typ a název z payloadu
+          TYPE='${{ github.event.client_payload.type }}'
+          NAME='${{ github.event.client_payload.name }}'
+
+          # Zvýšíme hodnotu
+          UPDATED=$(echo "$EXISTING" | jq --arg t "$TYPE" --arg n "$NAME" '
+            .[$t][$n] = ( .[$t][$n] // 0 ) + 1
+          ')
+
+          echo "$UPDATED" > $FILE
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add stats.json
+          git commit -m "Update stats" || echo "No changes to commit"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
